@@ -3,74 +3,81 @@ package go_login
 import (
 	"net/http"
 	"log"
+	"strconv"
 )
 
 type LoginManager struct {
-	UserMap map[string] *UserMixin
+	UserMap map[string] BaseUser
 	config *config
+	userNum int
 }
 
 func NewLoginManager(config *config)*LoginManager{
 	return &LoginManager{
-		UserMap:make(map[string] *UserMixin),
+		UserMap:make(map[string] BaseUser),
 		config:config,
+		userNum:0,
 	}
 }
 
-func (manager *LoginManager)Auth(request *http.Request) (*UserMixin, bool){
+
+func (manager *LoginManager)Auth(request *http.Request) (BaseUser, bool){
+	currentUser, ok := manager.Current(request)
+	if currentUser==nil&&ok == false{
+		return nil,false
+	}
+
+	if currentUser.getIsLogin() == false{
+		return  currentUser,false
+	} // user not login
+
+	token, _:= GetToken(request.Cookies())
+	if token != currentUser.getToken(){
+		return nil,false
+	} //token auth fail
+
+	return  currentUser,true
+}
+
+func (manager *LoginManager)Current(request *http.Request) (BaseUser, bool){
+
 	cookies := request.Cookies()
 	sessionId, index := GetSessionId(cookies)
 	if index == -1{
 		return nil,false
 	}
+
 	user := manager.UserMap[sessionId]
+
 	if user == nil{
-		return nil, false
-	}
-
-	if user.isLogin == false{
-		return  user,false
-	}
-
-	token, _:= GetToken(cookies)
-	if token != user.token{
 		return nil,false
 	}
 
-	return  user,true
+	return  user,user.getIsLogin()
 }
 
-func (manager *LoginManager)Current(request *http.Request) (*UserMixin, error){
-
-	cookies := request.Cookies()
-	sessionId, index := GetSessionId(cookies)
-	if index == -1{
-		return nil,nil
-	}
-
-	user := manager.UserMap[sessionId]
-
-	return  user,nil
-}
-
-func (manager *LoginManager) Login(user *UserMixin,w *http.ResponseWriter)  {
-	if user.isLogin == true{
-		log.Println("User: ",user.identity," Already Login")
+func (manager *LoginManager) Login(user BaseUser,w *http.ResponseWriter)  {
+	if user.getIsLogin() == true{
+		log.Println("User: ",user.getIdentity()," Already Login")
 		return
 	}
-	user.isLogin = true
-	user.identity = GenSessionId(manager.config.secret)
-	user.token = GenToken(user.identity)
-	http.SetCookie(*w,&http.Cookie{Name:"session_id",Value:user.identity})
-	http.SetCookie(*w,&http.Cookie{Name:"token",Value:user.token})
-	manager.UserMap[user.identity] = user
-	log.Println("User: ",user.identity," Login Success")
+	user.setIsLogin(true)
+	if _,ok := manager.UserMap[user.getIdentity()];!ok{
+		user.setIdentity(GenSessionId(manager.config.secret+strconv.Itoa(manager.userNum)))
+	}
+	manager.userNum++
+	user.setToken(GenToken(user.getIdentity()))
+	http.SetCookie(*w,&http.Cookie{Name:"session_id",Value:user.getIdentity()})
+	http.SetCookie(*w,&http.Cookie{Name:"token",Value:user.getToken()})
+	manager.UserMap[user.getIdentity()] = user
+	log.Println("User: ",user.getIdentity()," Login Success")
 }
 
-func (manager *LoginManager) Logout(user *UserMixin, r *http.Request)  {
-	user.isLogin = false
+func (manager *LoginManager) Logout(user BaseUser, r *http.Request, w *http.ResponseWriter)  {
+	user.setIsLogin(false)
 	sessionId, _ := GetSessionId(r.Cookies())
 	delete(manager.UserMap, sessionId)
-	log.Println("User: ",user.identity," Logout")
+	log.Println("User: ",user.getIdentity()," Logout")
+
 }
 
