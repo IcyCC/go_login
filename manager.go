@@ -31,7 +31,7 @@ func (manager *LoginManager)Auth(request *http.Request) (BaseUser, bool){
 		return  currentUser,false
 	} // user not login
 
-	token, _:= GetToken(request.Cookies())
+	token, _:= GetToken(request)
 	if token != currentUser.getToken(){
 		return nil,false
 	} //token auth fail
@@ -41,9 +41,9 @@ func (manager *LoginManager)Auth(request *http.Request) (BaseUser, bool){
 
 func (manager *LoginManager)Current(request *http.Request) (BaseUser, bool){
 
-	cookies := request.Cookies()
-	sessionId, index := GetSessionId(cookies)
-	if index == -1{
+
+	sessionId, err := GetSessionId(request)
+	if err != nil{
 		return nil,false
 	}
 
@@ -74,8 +74,11 @@ func (manager *LoginManager) Login(user BaseUser,w *http.ResponseWriter)  {
 }
 
 func (manager *LoginManager) Logout(user BaseUser, r *http.Request, w *http.ResponseWriter)  {
+	if user == nil || user.getIsLogin() == false {
+		return
+	}
 	user.setIsLogin(false)
-	sessionId, _ := GetSessionId(r.Cookies())
+	sessionId, _ := GetSessionId(r)
 	delete(manager.UserMap, sessionId)
 	log.Println("User: ",user.getIdentity()," Logout")
 

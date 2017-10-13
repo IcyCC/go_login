@@ -23,34 +23,20 @@ func GenToken(identity string) string{
 	return res
 }
 
-func GetSessionId(cookies []*http.Cookie) (sessionId string, index int){
-	sessionId = ""
-	index = -1
-	for i, cookie := range cookies{
-		if cookie.Name == "session_id"{
-			index = i
-			sessionId = cookie.Value
-			break
-		}
+func GetSessionId(r *http.Request) (string,error){
+	sessionId, err := r.Cookie("session_id")
+	if err != nil{
+		return "",err
 	}
-	if index == -1{
-		return  "",-1
-	}
-	return sessionId, index
+
+	return sessionId.Value, err
 }
 
-func GetToken(cookies []*http.Cookie) (token string, index int){
-	index = -1
-	for i, cookie := range cookies{
-		if cookie.Name == "token"{
-			index = i
-			token = cookie.Value
-			break
-		}
-	}
-	if index == -1{
-		return  "",-1
+func GetToken(r *http.Request) (string,error){
+	token, err := r.Cookie("token")
+	if err != nil{
+		return "",err
 	}
 
-	return token, index
+	return token.Value, err
 }
