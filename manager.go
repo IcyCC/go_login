@@ -4,20 +4,33 @@ import (
 	"net/http"
 	"log"
 	"strconv"
+	"time"
 )
 
 type LoginManager struct {
 	UserMap map[string] BaseUser
 	config *config
 	userNum int
+	lifeTime time.Duration
 }
 
+
 func NewLoginManager(config *config)*LoginManager{
-	return &LoginManager{
+	m := &LoginManager{
 		UserMap:make(map[string] BaseUser),
 		config:config,
 		userNum:0,
+		lifeTime:20*time.Second,
 	}
+
+	ticker := time.NewTicker(m.lifeTime)
+	go func() {
+		for _ = range ticker.C {
+			m.GC()
+		}
+	}()
+
+	return m
 }
 
 
@@ -41,7 +54,6 @@ func (manager *LoginManager)Auth(request *http.Request) (BaseUser, bool){
 
 func (manager *LoginManager)Current(request *http.Request) (BaseUser, bool){
 
-
 	sessionId, err := GetSessionId(request)
 	if err != nil{
 		return nil,false
@@ -53,6 +65,8 @@ func (manager *LoginManager)Current(request *http.Request) (BaseUser, bool){
 		return nil,false
 	}
 
+	user.addLife()
+
 	return  user,user.getIsLogin()
 }
 
@@ -62,6 +76,7 @@ func (manager *LoginManager) Login(user BaseUser,w *http.ResponseWriter)  {
 		return
 	}
 	user.setIsLogin(true)
+	user.setLife(2)
 	if _,ok := manager.UserMap[user.getIdentity()];!ok{
 		user.setIdentity(GenSessionId(manager.config.secret+strconv.Itoa(manager.userNum)))
 	}
@@ -84,3 +99,12 @@ func (manager *LoginManager) Logout(user BaseUser, r *http.Request, w *http.Resp
 
 }
 
+func (manager *LoginManager) GC(){
+	log.Println("User GC")
+	for k,v := range manager.UserMap{
+		v.reduceLife()
+		if v.getLife() <= 0{
+			delete(manager.UserMap, k)
+		}
+	}
+}
