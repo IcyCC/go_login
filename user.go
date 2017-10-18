@@ -1,9 +1,11 @@
 package go_login
 
+
 type UserMixin struct{
 	isLogin bool
 	token string
 	identity string
+	gcFlag int
 }
 
 type BaseUser interface {
@@ -15,6 +17,11 @@ type BaseUser interface {
 
 	setIdentity(identity string)
 	getIdentity()(string)
+
+	reduceLife()
+	addLife()
+	getLife()int
+	setLife(int)
 }
 
 func (user*UserMixin)setIsLogin(b bool)  {
@@ -39,4 +46,20 @@ func (user *UserMixin)setIdentity(identity string){
 
 func (user *UserMixin)getIdentity()string{
 	return user.identity
+}
+
+func (user *UserMixin)reduceLife(){
+	user.gcFlag = user.gcFlag - 1
+}
+
+func (user *UserMixin)addLife(){
+	user.gcFlag = user.gcFlag + 1
+}
+
+func (user *UserMixin)getLife()int{
+	return user.gcFlag
+}
+
+func (user *UserMixin)setLife(life int){
+	user.gcFlag = life
 }
